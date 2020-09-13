@@ -144,7 +144,7 @@ func dir_listing_worker(
 	for request := range(work_requests) {
 		f, _ := os.Open(request)
 		fsitems, err := f.Readdir(1) 
-		for err != io.EOF {
+		for err != io.EOF && len(fsitems) > 0{
 			fsitem := fsitems[0]
 			abspath := filepath.Join(request, fsitem.Name())
 			fsi := T_fsitem_info{
