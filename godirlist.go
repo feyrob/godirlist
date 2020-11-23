@@ -20,8 +20,6 @@ package godirlist
 // - not tested with long paths
 // - not handling errors
 // - the 2 similar select statements are not elegant
-// - as is, the code does not clean up after itself (should not be used repeatedly in a running service)
-//   - speficially the workers never exit (should be easy to fix, but I didn't need it)
 // - the buffer is not bounded (might cause issues if your 1 TiB video game library with the memory of a 20 year old phone)
 //
 // I'd be happy to hear of speed improvements! :)
@@ -104,8 +102,11 @@ func dir_listing_worker(
 ) {
 	for request := range work_requests {
 		f, _ := os.Open(request)
-		fsitems, err := f.Readdir(1)
-		for err != io.EOF && len(fsitems) > 0 {
+		for {
+			fsitems, err := f.Readdir(1)
+			if err == io.EOF || len(fsitems) == 0 {
+				break
+			}
 			fsitem := fsitems[0]
 			abspath := filepath.Join(request, fsitem.Name())
 			fsi := FsitemInfo{
@@ -118,7 +119,6 @@ func dir_listing_worker(
 				atomic.AddInt64(incomplete_request_count, 1)
 				buffer_requests <- abspath
 			}
-			fsitems, err = f.Readdir(1)
 		}
 		f.Close()
 		atomic.AddInt64(incomplete_request_count, -1)
