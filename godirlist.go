@@ -3,7 +3,7 @@ package godirlist
 // fast dir listing
 
 // the good:
-// - faster than any other file listing code I'm aware of (including robocopy and windirstat)
+// - much faster than any other file listing code I'm aware of (including robocopy and windirstat)
 // - the code has been optimized very little, so there are probably ways to make it faster still
 // - ~100 lines of verbose code, so should be easy to:
 //   - understand
@@ -14,15 +14,9 @@ package godirlist
 // - aside from the caveats below it has worked reliably for me
 //
 // the bad:
-// - not adhering to any coding style
-// - probably not using good go concurrency patterns
 // - not tested with junctions/symlinks/netmounted/user fs/etc.
 // - not tested with long paths
-// - not handling errors
-// - the 2 similar select statements are not elegant
-// - the buffer is not bounded (might cause issues if your 1 TiB video game library with the memory of a 20 year old phone)
-//
-// I'd be happy to hear of speed improvements! :)
+// - no error handling
 //
 
 import (
@@ -59,38 +53,41 @@ func GenerateFsitemInfos(
 	}
 
 	var buffer []string
-
 	for _, start_dir_abspath := range start_dir_abspaths {
 		buffer = append(buffer, start_dir_abspath)
 		atomic.AddInt64(&incomplete_request_count, 1)
 	}
 
 	for {
+		// Note, that this depends on how go will not write to a channel that is nil...
+		sink_chan := work_requests
+		exit_chan := done
+		next_buffer_val := ""
+
 		if len(buffer) > 0 {
-			select {
-			case work_requests <- buffer[0]:
-				{
-					buffer = buffer[1:]
-				}
-			case buffer_request := <-buffer_requests:
-				{
-					buffer = append(buffer, buffer_request)
-				}
-			}
+			// don't exit if there is still content in the buffer to process
+			exit_chan = nil
+			next_buffer_val = buffer[0]
 		} else {
-			select {
-			case buffer_request := <-buffer_requests:
-				{
-					buffer = append(buffer, buffer_request)
-				}
-			case <-done:
-				{
-					goto exit_for
-				}
+			// buffer is empty, don't read from it
+			sink_chan = nil
+		}
+
+		select {
+		case sink_chan <- next_buffer_val:
+			{
+				buffer = buffer[1:]
+			}
+		case buffer_request := <-buffer_requests:
+			{
+				buffer = append(buffer, buffer_request)
+			}
+		case <-exit_chan:
+			{
+				return
 			}
 		}
 	}
-exit_for:
 }
 
 func dir_listing_worker(

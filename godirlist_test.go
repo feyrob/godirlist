@@ -25,19 +25,23 @@ func Test_1(t *testing.T) {
 		close(fsitem_chan)
 	}()
 
-	found_count := 0
+	file_count := 0
+	directory_count := 0
+	other_count := 0
 	total_size := int64(0)
 	for fsitem := range fsitem_chan {
 		// do stuff with found files ...
+
 		if fsitem.fi.Mode().IsRegular() {
 			s := fsitem.fi.Size()
 			total_size += s
+			file_count++
+		} else if fsitem.fi.IsDir() {
+			directory_count++
+		} else {
+			other_count++
 		}
-		found_count++
 	}
-
 	duration := time.Since(startTime)
-	size_str := fmt.Sprintf("%d", total_size)
-	found_count_str := fmt.Sprintf("%d", found_count)
-	fmt.Println("Duration: " + duration.String() + "  total_size: " + size_str + " found_count: " + found_count_str)
+	fmt.Println("wait:", duration, "bytes:", total_size, "files:", file_count, "directories:", directory_count, "other:", other_count)
 }
