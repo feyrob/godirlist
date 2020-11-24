@@ -4,7 +4,6 @@ package godirlist
 
 // the good:
 // - much faster than any other file listing code I'm aware of (including robocopy and windirstat)
-// - the code has been optimized very little, so there are probably ways to make it faster still
 // - ~100 lines of verbose code, so should be easy to:
 //   - understand
 //   - clean up
@@ -14,10 +13,7 @@ package godirlist
 // - aside from the caveats below it has worked reliably for me
 //
 // the bad:
-// - not tested with junctions/symlinks/netmounted/user fs/etc.
-// - not tested with long paths
 // - no error handling
-//
 
 import (
 	"io"
@@ -106,10 +102,7 @@ func dir_listing_worker(
 			}
 			fsitem := fsitems[0]
 			abspath := filepath.Join(request, fsitem.Name())
-			fsi := FsitemInfo{
-				fsitem,
-				abspath,
-			}
+			fsi := FsitemInfo{fsitem, abspath}
 			results <- fsi
 
 			if fsitem.IsDir() {
