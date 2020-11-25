@@ -23,8 +23,8 @@ import (
 )
 
 type FsitemInfo struct {
-	fi      os.FileInfo
-	abspath string
+	Fi      os.FileInfo
+	Abspath string
 }
 
 func GenerateFsitemInfos(
@@ -32,51 +32,50 @@ func GenerateFsitemInfos(
 	results chan FsitemInfo,
 	worker_count int,
 ) {
+	dirlist_chan := make(chan string)
+	queue_chan := make(chan string)
 	var incomplete_request_count int64
-
-	work_requests := make(chan string)
-	buffer_requests := make(chan string)
-	done := make(chan struct{})
+	done_chan := make(chan struct{})
 
 	for i := 0; i < worker_count; i++ {
 		go dir_listing_worker(
-			work_requests,
-			buffer_requests,
 			results,
+			dirlist_chan,
+			queue_chan,
 			&incomplete_request_count,
-			done,
+			done_chan,
 		)
 	}
 
-	var buffer []string
+	var queue []string
 	for _, start_dir_abspath := range start_dir_abspaths {
-		buffer = append(buffer, start_dir_abspath)
+		queue = append(queue, start_dir_abspath)
 		atomic.AddInt64(&incomplete_request_count, 1)
 	}
 
 	for {
 		// Note, that this depends on how go will not write to a channel that is nil...
-		sink_chan := work_requests
-		exit_chan := done
-		next_buffer_val := ""
+		sink := dirlist_chan
+		exit_chan := done_chan
+		next_queue_val := ""
 
-		if len(buffer) > 0 {
-			// don't exit if there is still content in the buffer to process
+		if len(queue) > 0 {
+			// don't exit if there is still content in the queue to process
 			exit_chan = nil
-			next_buffer_val = buffer[0]
+			next_queue_val = queue[0]
 		} else {
-			// buffer is empty, don't read from it
-			sink_chan = nil
+			// queue is empty, don't read from it
+			sink = nil
 		}
 
 		select {
-		case sink_chan <- next_buffer_val:
+		case sink <- next_queue_val:
 			{
-				buffer = buffer[1:]
+				queue = queue[1:]
 			}
-		case buffer_request := <-buffer_requests:
+		case queue_request := <-queue_chan:
 			{
-				buffer = append(buffer, buffer_request)
+				queue = append(queue, queue_request)
 			}
 		case <-exit_chan:
 			{
@@ -87,13 +86,13 @@ func GenerateFsitemInfos(
 }
 
 func dir_listing_worker(
-	work_requests chan string,
-	buffer_requests chan string,
-	results chan FsitemInfo,
+	result_chan chan FsitemInfo,
+	dirlist_chan chan string,
+	queue_chan chan string,
 	incomplete_request_count *int64,
-	done chan struct{},
+	done_chan chan struct{},
 ) {
-	for request := range work_requests {
+	for request := range dirlist_chan {
 		f, _ := os.Open(request)
 		for {
 			fsitems, err := f.Readdir(1)
@@ -103,17 +102,17 @@ func dir_listing_worker(
 			fsitem := fsitems[0]
 			abspath := filepath.Join(request, fsitem.Name())
 			fsi := FsitemInfo{fsitem, abspath}
-			results <- fsi
+			result_chan <- fsi
 
 			if fsitem.IsDir() {
 				atomic.AddInt64(incomplete_request_count, 1)
-				buffer_requests <- abspath
+				queue_chan <- abspath
 			}
 		}
 		f.Close()
 		atomic.AddInt64(incomplete_request_count, -1)
 		if atomic.LoadInt64(incomplete_request_count) == 0 {
-			done <- struct{}{}
+			done_chan <- struct{}{}
 		}
 	}
 }

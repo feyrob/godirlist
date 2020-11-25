@@ -27,11 +27,11 @@ func Test_1(t *testing.T) {
 	total_size := int64(0)
 	for fsitem := range fsitem_chan {
 		// do stuff with found files ...
-		if fsitem.fi.Mode().IsRegular() {
-			s := fsitem.fi.Size()
+		if fsitem.Fi.Mode().IsRegular() {
+			s := fsitem.Fi.Size()
 			total_size += s
 			file_count++
-		} else if fsitem.fi.IsDir() {
+		} else if fsitem.Fi.IsDir() {
 			directory_count++
 		} else {
 			other_count++
