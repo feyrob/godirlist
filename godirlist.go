@@ -29,7 +29,7 @@ type FsitemInfo struct {
 
 func GenerateFsitemInfos(
 	start_dir_abspaths []string,
-	result_handler func([]FsitemInfo),
+	result_handler func([]FsitemInfo), // takes a slice so that a result_handler can send multiple items in one channel send operation (which can easily be the bottleneck)
 	worker_count int,
 ) {
 	dirlist_chan := make(chan string)
@@ -94,7 +94,7 @@ func dir_listing_worker(
 ) {
 	for request := range dirlist_chan {
 		f, _ := os.Open(request)
-		results := make([]FsitemInfo, 0)
+		results := make([]FsitemInfo, 0, 16)
 		for {
 			fsitems, err := f.Readdir(1)
 			if err == io.EOF || len(fsitems) == 0 {

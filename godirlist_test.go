@@ -10,7 +10,7 @@ import (
 func Test_1(t *testing.T) {
 	fmt.Println("hi")
 	test_abspath := `C:\Program Files`
-	test_abspath = `C:\`
+	//test_abspath = `C:\`
 	worker_count := 64
 	paths := []string{
 		test_abspath,
