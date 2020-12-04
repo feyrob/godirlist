@@ -29,7 +29,7 @@ type FsitemInfo struct {
 
 func GenerateFsitemInfos(
 	start_dir_abspaths []string,
-	results chan FsitemInfo,
+	result_handler func([]FsitemInfo),
 	worker_count int,
 ) {
 	dirlist_chan := make(chan string)
@@ -39,7 +39,7 @@ func GenerateFsitemInfos(
 
 	for i := 0; i < worker_count; i++ {
 		go dir_listing_worker(
-			results,
+			result_handler,
 			dirlist_chan,
 			queue_chan,
 			&incomplete_request_count,
@@ -86,7 +86,7 @@ func GenerateFsitemInfos(
 }
 
 func dir_listing_worker(
-	result_chan chan FsitemInfo,
+	result_handler func([]FsitemInfo),
 	dirlist_chan chan string,
 	queue_chan chan string,
 	incomplete_request_count *int64,
@@ -94,6 +94,7 @@ func dir_listing_worker(
 ) {
 	for request := range dirlist_chan {
 		f, _ := os.Open(request)
+		results := make([]FsitemInfo, 0)
 		for {
 			fsitems, err := f.Readdir(1)
 			if err == io.EOF || len(fsitems) == 0 {
@@ -102,13 +103,14 @@ func dir_listing_worker(
 			fsitem := fsitems[0]
 			abspath := filepath.Join(request, fsitem.Name())
 			fsi := FsitemInfo{fsitem, abspath}
-			result_chan <- fsi
-
+			_ = fsi
+			results = append(results, fsi)
 			if fsitem.IsDir() {
 				atomic.AddInt64(incomplete_request_count, 1)
 				queue_chan <- abspath
 			}
 		}
+		result_handler(results)
 		f.Close()
 		atomic.AddInt64(incomplete_request_count, -1)
 		if atomic.LoadInt64(incomplete_request_count) == 0 {

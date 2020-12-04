@@ -9,16 +9,23 @@ import (
 func Test_1(t *testing.T) {
 	fmt.Println("hi")
 	test_abspath := `C:\Program Files`
-	// 14 worked best on my 12 core machine with SSD
-	// 48 worked best for high latency NAS folders
-	worker_count := 14
+	//test_abspath = `C:\`
+	worker_count := 64
 	paths := []string{
 		test_abspath,
 	}
 	startTime := time.Now()
 	fsitem_chan := make(chan FsitemInfo)
+
+	result_handler := func(some_results []FsitemInfo) {
+		for _, result := range some_results {
+			_ = result
+			fsitem_chan <- result
+		}
+	}
+
 	go func() {
-		GenerateFsitemInfos(paths, fsitem_chan, worker_count)
+		GenerateFsitemInfos(paths, result_handler, worker_count)
 		close(fsitem_chan)
 	}()
 	file_count := 0
