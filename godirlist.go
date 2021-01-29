@@ -112,8 +112,8 @@ func dir_listing_worker(
 		}
 		result_handler(results)
 		f.Close()
-		atomic.AddInt64(incomplete_request_count, -1)
-		if atomic.LoadInt64(incomplete_request_count) == 0 {
+		new_count := atomic.AddInt64(incomplete_request_count, -1)
+		if new_count == 0 {
 			done_chan <- struct{}{}
 		}
 	}
