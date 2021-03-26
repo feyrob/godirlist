@@ -79,10 +79,12 @@ func GenerateFsitemInfos(
 			}
 		case <-exit_chan:
 			{
-				return
+				goto exit
 			}
 		}
 	}
+exit:
+	close(dirlist_chan)
 }
 
 func dir_listing_worker(
